@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+institute.db
+institute.db-shm
+institute.db-wal
+.DS_Store
