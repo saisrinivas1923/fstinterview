@@ -42,7 +42,28 @@ async function seed() {
     console.log(`✅ Permanent Admin verified: ${permanentAdminEmail}`);
   }
 
-  // 2. Production Deployed Website Mode:
+  // 2. Ensure SMTP settings exist in database
+  const existingSmtp = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get();
+  if (!existingSmtp || !existingSmtp.value) {
+    const upsertSetting = db.prepare(`
+      INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+    `);
+    const smtpUser = process.env.SMTP_USER || 'futuresprintinterview@gmail.com';
+    const smtpPass = process.env.SMTP_PASS || 'smldivdyibnqvobv';
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = process.env.SMTP_PORT || '465';
+    const fromEmail = process.env.FROM_EMAIL || '"Future Sprint Technologies" <futuresprintinterview@gmail.com>';
+
+    upsertSetting.run('smtp_host', smtpHost);
+    upsertSetting.run('smtp_port', String(smtpPort));
+    upsertSetting.run('smtp_user', smtpUser);
+    upsertSetting.run('smtp_pass', smtpPass);
+    upsertSetting.run('from_email', fromEmail);
+    console.log(`✅ Default SMTP settings initialized for: ${smtpUser}`);
+  }
+
+  // 3. Production Deployed Website Mode:
   // Student accounts and interview records are created in real time by enrolled students.
   console.log('✨ Seed complete (Production Deployed Mode: Clean database with Permanent Admin verified).');
 }

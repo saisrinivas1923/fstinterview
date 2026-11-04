@@ -113,7 +113,8 @@ router.post('/register', async (req, res) => {
     `).run(trimmedEmail, otpCode, userData);
 
     // Send the OTP via email
-    await sendVerificationOtpEmail(trimmedEmail, trimmedName, otpCode);
+    const mailResult = await sendVerificationOtpEmail(trimmedEmail, trimmedName, otpCode);
+    console.log(`[Registration] Verification OTP dispatch to ${trimmedEmail}: mode=${mailResult.mode}, success=${mailResult.success}`);
 
     return res.status(200).json({
       success: true,

@@ -2,31 +2,35 @@ const nodemailer = require('nodemailer');
 const db = require('../database');
 
 function getSmtpConfig() {
+  const defaultUser = 'futuresprintinterview@gmail.com';
+  const defaultPass = 'smldivdyibnqvobv';
+  const defaultFrom = '"Future Sprint Technologies" <futuresprintinterview@gmail.com>';
+
   try {
     const rows = db.prepare("SELECT key, value FROM settings WHERE key LIKE ? OR key = ?").all('smtp_%', 'from_email');
     const config = {};
     rows.forEach(r => { config[r.key] = r.value; });
 
-    // Ensure dummy placeholder passwords don't block valid .env credentials
+    // Ensure dummy placeholder passwords don't block valid credentials
     const isDummyPass = config.smtp_pass === 'apppassword1234' || !config.smtp_pass;
-    const finalPass = (!isDummyPass && config.smtp_pass) ? config.smtp_pass : (process.env.SMTP_PASS || '');
-    const finalUser = (!isDummyPass && config.smtp_user) ? config.smtp_user : (process.env.SMTP_USER || config.smtp_user || '');
+    const finalPass = (!isDummyPass && config.smtp_pass) ? config.smtp_pass : (process.env.SMTP_PASS || defaultPass);
+    const finalUser = (!isDummyPass && config.smtp_user) ? config.smtp_user : (process.env.SMTP_USER || defaultUser);
 
     return {
       host: config.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(config.smtp_port || process.env.SMTP_PORT || 465),
-      user: finalUser ? finalUser.trim() : '',
-      pass: finalPass ? finalPass.replace(/\s+/g, '') : '',
-      from: config.from_email || process.env.FROM_EMAIL || '"Future Sprint Technologies" <futuresprintinterview@gmail.com>'
+      user: finalUser ? finalUser.trim() : defaultUser,
+      pass: finalPass ? finalPass.replace(/\s+/g, '') : defaultPass,
+      from: config.from_email || process.env.FROM_EMAIL || defaultFrom
     };
   } catch (e) {
     console.error('getSmtpConfig error:', e.message);
     return {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT || 465),
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
-      from: process.env.FROM_EMAIL || '"Future Sprint Technologies" <admissions@futuresprintech.com>'
+      user: process.env.SMTP_USER || defaultUser,
+      pass: process.env.SMTP_PASS || defaultPass,
+      from: process.env.FROM_EMAIL || defaultFrom
     };
   }
 }
@@ -34,6 +38,17 @@ function getSmtpConfig() {
 function createTransporter() {
   const config = getSmtpConfig();
   if (config.user && config.pass) {
+    // If using Gmail, service: 'gmail' automatically configures optimal ports & TLS across cloud hosts (Render, AWS, etc.)
+    if (config.host === 'smtp.gmail.com' || config.user.endsWith('@gmail.com')) {
+      return nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: config.user,
+          pass: config.pass
+        }
+      });
+    }
+
     const port = Number(config.port) || 465;
     return nodemailer.createTransport({
       host: config.host || 'smtp.gmail.com',
