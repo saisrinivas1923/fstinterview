@@ -38,14 +38,21 @@ function getSmtpConfig() {
 function createTransporter() {
   const config = getSmtpConfig();
   if (config.user && config.pass) {
-    // If using Gmail, service: 'gmail' automatically configures optimal ports & TLS across cloud hosts (Render, AWS, etc.)
+    const fastTimeouts = {
+      connectionTimeout: 4000, // 4s max connect timeout (fails fast on cloud firewall blocked ports)
+      greetingTimeout: 3000,   // 3s max greeting timeout
+      socketTimeout: 5000      // 5s max socket timeout
+    };
+
+    // If using Gmail, service: 'gmail' automatically configures optimal ports & TLS across cloud hosts
     if (config.host === 'smtp.gmail.com' || config.user.endsWith('@gmail.com')) {
       return nodemailer.createTransport({
         service: 'gmail',
         auth: {
           user: config.user,
           pass: config.pass
-        }
+        },
+        ...fastTimeouts
       });
     }
 
@@ -60,9 +67,76 @@ function createTransporter() {
       },
       tls: {
         rejectUnauthorized: false
-      }
+      },
+      ...fastTimeouts
     });
   }
+  return null;
+}
+
+// Optional HTTPS API dispatch (Port 443) for cloud platforms like Render free tier that block outbound SMTP ports (25/465/587)
+async function sendViaHttpApi(toEmail, toName, subject, htmlContent, textContent) {
+  const resendKey = process.env.RESEND_API_KEY;
+  const brevoKey = process.env.BREVO_API_KEY;
+
+  if (resendKey) {
+    try {
+      console.log('🚀 Attempting email dispatch via Resend HTTPS API (Port 443)...');
+      const resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: process.env.RESEND_FROM || 'Future Sprint Technologies <onboarding@resend.dev>',
+          to: [toEmail],
+          subject,
+          html: htmlContent,
+          text: textContent
+        }),
+        signal: AbortSignal.timeout(5000)
+      });
+      const data = await resp.json();
+      if (resp.ok && data.id) {
+        console.log('✅ Email sent via Resend API! ID:', data.id);
+        return { success: true, mode: 'api', messageId: data.id };
+      }
+      console.warn('⚠️ Resend API returned non-OK response:', data);
+    } catch (e) {
+      console.warn('⚠️ Resend API request failed:', e.message);
+    }
+  }
+
+  if (brevoKey) {
+    try {
+      console.log('🚀 Attempting email dispatch via Brevo HTTPS API (Port 443)...');
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'Future Sprint Technologies', email: process.env.BREVO_SENDER || 'futuresprintinterview@gmail.com' },
+          to: [{ email: toEmail, name: toName || 'Student' }],
+          subject,
+          htmlContent,
+          textContent
+        }),
+        signal: AbortSignal.timeout(5000)
+      });
+      const data = await resp.json();
+      if (resp.ok && (data.messageId || data.id)) {
+        console.log('✅ Email sent via Brevo API! MessageId:', data.messageId || data.id);
+        return { success: true, mode: 'api', messageId: data.messageId || data.id };
+      }
+      console.warn('⚠️ Brevo API returned non-OK response:', data);
+    } catch (e) {
+      console.warn('⚠️ Brevo API request failed:', e.message);
+    }
+  }
+
   return null;
 }
 
@@ -123,6 +197,15 @@ async function sendVerificationOtpEmail(toEmail, toName, otpCode) {
   console.log(`⏱️ Expiry:    10 Minutes`);
   console.log('================================================================');
 
+  const textContent = `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies verification code is: ${otpCode}\n\nThis OTP is valid for 10 minutes. Please enter this code on the portal to activate your account.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`;
+
+  // 1. Try HTTPS API if API keys are configured (works on all cloud free tiers including Render)
+  const apiResult = await sendViaHttpApi(toEmail, toName, subject, htmlContent, textContent);
+  if (apiResult && apiResult.success) {
+    return { success: true, mode: 'api', messageId: apiResult.messageId, otp: otpCode };
+  }
+
+  // 2. Try SMTP via Nodemailer
   const transporter = createTransporter();
 
   if (transporter) {
@@ -132,22 +215,22 @@ async function sendVerificationOtpEmail(toEmail, toName, otpCode) {
         from: fromAddress,
         to: toEmail,
         subject,
-        text: `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies verification code is: ${otpCode}\n\nThis OTP is valid for 10 minutes. Please enter this code on the portal to activate your account.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`,
+        text: textContent,
         html: htmlContent
       });
       console.log('✅ Real Email sent successfully! MessageId:', info.messageId, 'Recipient:', toEmail);
       return { success: true, mode: 'smtp', messageId: info.messageId, otp: otpCode };
     } catch (err) {
-      console.error('⚠️ Real SMTP delivery failed:', err.message);
+      console.error('⚠️ Real SMTP delivery failed (outbound ports likely blocked on cloud host):', err.message);
       // Fallback: log to terminal so verification is never blocked
-      return { success: true, mode: 'logged', error: err.message, otp: otpCode };
+      return { success: true, mode: 'fallback', error: err.message, otp: otpCode };
     }
   }
 
   // If no SMTP configured yet in .env, still allow the OTP flow to proceed smoothly like a hosted site
   return {
     success: true,
-    mode: 'logged',
+    mode: 'fallback',
     otp: otpCode,
     notice: 'OTP logged to server terminal for instant verification.'
   };
@@ -210,6 +293,15 @@ async function sendPasswordResetOtpEmail(toEmail, toName, otpCode) {
   console.log(`⏱️ Expiry:    10 Minutes`);
   console.log('================================================================');
 
+  const textContent = `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies password reset code is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`;
+
+  // 1. Try HTTPS API
+  const apiResult = await sendViaHttpApi(toEmail, toName, subject, htmlContent, textContent);
+  if (apiResult && apiResult.success) {
+    return { success: true, mode: 'api', messageId: apiResult.messageId, otp: otpCode };
+  }
+
+  // 2. Try SMTP
   const transporter = createTransporter();
 
   if (transporter) {
@@ -219,20 +311,20 @@ async function sendPasswordResetOtpEmail(toEmail, toName, otpCode) {
         from: fromAddress,
         to: toEmail,
         subject,
-        text: `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies password reset code is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`,
+        text: textContent,
         html: htmlContent
       });
       console.log('✅ Real Password OTP sent successfully! MessageId:', info.messageId, 'Recipient:', toEmail);
       return { success: true, mode: 'smtp', messageId: info.messageId, otp: otpCode };
     } catch (err) {
-      console.error('⚠️ Real SMTP delivery failed:', err.message);
-      return { success: true, mode: 'logged', error: err.message, otp: otpCode };
+      console.error('⚠️ Real SMTP delivery failed (outbound ports likely blocked on cloud host):', err.message);
+      return { success: true, mode: 'fallback', error: err.message, otp: otpCode };
     }
   }
 
   return {
     success: true,
-    mode: 'logged',
+    mode: 'fallback',
     otp: otpCode,
     notice: 'Password OTP logged to server terminal for instant verification.'
   };
@@ -369,6 +461,12 @@ async function sendInterviewReminderEmail(data) {
   console.log(`🕒 Time:       ${interviewTime} on ${interviewDate}`);
   console.log(`📍 Reporting:  Hema Durga Plaza Flat 207, Miyapur`);
   console.log('================================================================');
+
+  // 1. Try HTTPS API if keys configured
+  const apiResult = await sendViaHttpApi(toEmail, toName, subject, htmlContent, `Interview with ${companyName} at ${interviewTime} on ${interviewDate}. Report to Future Sprint Technologies office.`);
+  if (apiResult && apiResult.success) {
+    return { success: true, mode: 'api', messageId: apiResult.messageId };
+  }
 
   const transporter = createTransporter();
 
