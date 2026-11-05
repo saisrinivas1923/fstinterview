@@ -54,9 +54,9 @@ async function sendViaResend(toEmail, toName, subject, htmlContent, textContent)
 }
 
 function getSmtpConfig() {
-  const defaultUser = 'futuresprintinterview@gmail.com';
-  const defaultPass = 'smldivdyibnqvobv';
-  const defaultFrom = '"Future Sprint Technologies" <futuresprintinterview@gmail.com>';
+  const defaultUser = 'futuresprinttechnologies@gmail.com';
+  const defaultPass = 'jebckryilxerweju';
+  const defaultFrom = '"Future Sprint Technologies" <futuresprinttechnologies@gmail.com>';
 
   try {
     const rows = db.prepare("SELECT key, value FROM settings WHERE key LIKE ? OR key = ?").all('smtp_%', 'from_email');

@@ -58,12 +58,12 @@ async function seed() {
     console.log(`✅ SMTP settings initialized from environment for: ${process.env.SMTP_USER}`);
   } else {
     const existingSmtp = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get();
-    if (!existingSmtp || !existingSmtp.value) {
-      const smtpUser = 'futuresprintinterview@gmail.com';
-      const smtpPass = 'smldivdyibnqvobv';
+    if (!existingSmtp || !existingSmtp.value || existingSmtp.value === 'futuresprintinterview@gmail.com') {
+      const smtpUser = 'futuresprinttechnologies@gmail.com';
+      const smtpPass = 'jebckryilxerweju';
       const smtpHost = 'smtp.gmail.com';
       const smtpPort = '465';
-      const fromEmail = '"Future Sprint Technologies" <futuresprintinterview@gmail.com>';
+      const fromEmail = '"Future Sprint Technologies" <futuresprinttechnologies@gmail.com>';
 
       upsertSetting.run('smtp_host', smtpHost);
       upsertSetting.run('smtp_port', String(smtpPort));
