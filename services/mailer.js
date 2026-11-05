@@ -6,12 +6,12 @@ function getResendConfig() {
   try {
     const rowKey = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
     const rowFrom = db.prepare("SELECT value FROM settings WHERE key = 'resend_from'").get();
-    const apiKey = (rowKey && rowKey.value && rowKey.value.trim()) ? rowKey.value.trim() : (process.env.RESEND_API_KEY || '');
-    const from = (rowFrom && rowFrom.value && rowFrom.value.trim()) ? rowFrom.value.trim() : (process.env.RESEND_FROM || defaultFrom);
+    const apiKey = process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.trim() : ((rowKey && rowKey.value) ? rowKey.value.trim() : '');
+    const from = process.env.RESEND_FROM ? process.env.RESEND_FROM.trim() : ((rowFrom && rowFrom.value) ? rowFrom.value.trim() : defaultFrom);
     return { apiKey, from };
   } catch (e) {
     return {
-      apiKey: process.env.RESEND_API_KEY || '',
+      apiKey: process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.trim() : '',
       from: process.env.RESEND_FROM || defaultFrom
     };
   }
@@ -65,23 +65,30 @@ function getSmtpConfig() {
 
     // Ensure dummy placeholder passwords don't block valid credentials
     const isDummyPass = config.smtp_pass === 'apppassword1234' || !config.smtp_pass;
-    const finalPass = (!isDummyPass && config.smtp_pass) ? config.smtp_pass : (process.env.SMTP_PASS || defaultPass);
-    const finalUser = (!isDummyPass && config.smtp_user) ? config.smtp_user : (process.env.SMTP_USER || defaultUser);
+    
+    // Environment variables take top precedence over database settings
+    const finalPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : ((!isDummyPass && config.smtp_pass) ? config.smtp_pass.replace(/\s+/g, '') : defaultPass);
+    const finalUser = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : ((!isDummyPass && config.smtp_user) ? config.smtp_user.trim() : defaultUser);
+    const finalHost = process.env.SMTP_HOST || config.smtp_host || 'smtp.gmail.com';
+    const finalPort = Number(process.env.SMTP_PORT || config.smtp_port || 465);
+    const finalFrom = process.env.FROM_EMAIL || config.from_email || defaultFrom;
 
     return {
-      host: config.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(config.smtp_port || process.env.SMTP_PORT || 465),
-      user: finalUser ? finalUser.trim() : defaultUser,
-      pass: finalPass ? finalPass.replace(/\s+/g, '') : defaultPass,
-      from: config.from_email || process.env.FROM_EMAIL || defaultFrom
+      host: finalHost,
+      port: finalPort,
+      user: finalUser,
+      pass: finalPass,
+      from: finalFrom
     };
   } catch (e) {
     console.error('getSmtpConfig error:', e.message);
+    const finalUser = (process.env.SMTP_USER || defaultUser).trim();
+    const finalPass = (process.env.SMTP_PASS || defaultPass).replace(/\s+/g, '');
     return {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT || 465),
-      user: process.env.SMTP_USER || defaultUser,
-      pass: process.env.SMTP_PASS || defaultPass,
+      user: finalUser,
+      pass: finalPass,
       from: process.env.FROM_EMAIL || defaultFrom
     };
   }
