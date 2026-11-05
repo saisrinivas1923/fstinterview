@@ -42,13 +42,14 @@ async function seed() {
     console.log(`✅ Permanent Admin verified: ${permanentAdminEmail}`);
   }
 
-  // 2. Ensure SMTP settings exist in database
+  // 2. Ensure SMTP and Resend settings exist in database
+  const upsertSetting = db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `);
+
   const existingSmtp = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get();
   if (!existingSmtp || !existingSmtp.value) {
-    const upsertSetting = db.prepare(`
-      INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
-    `);
     const smtpUser = process.env.SMTP_USER || 'futuresprintinterview@gmail.com';
     const smtpPass = process.env.SMTP_PASS || 'smldivdyibnqvobv';
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
@@ -62,6 +63,14 @@ async function seed() {
     upsertSetting.run('from_email', fromEmail);
     console.log(`✅ Default SMTP settings initialized for: ${smtpUser}`);
   }
+
+  // Initialize Resend HTTPS API Key from environment if provided
+  if (process.env.RESEND_API_KEY) {
+    upsertSetting.run('resend_api_key', process.env.RESEND_API_KEY.trim());
+    console.log('✅ Resend HTTPS API settings initialized from environment');
+  }
+  const resendFrom = process.env.RESEND_FROM || 'Future Sprint Technologies <onboarding@resend.dev>';
+  upsertSetting.run('resend_from', resendFrom);
 
   // 3. Production Deployed Website Mode:
   // Student accounts and interview records are created in real time by enrolled students.

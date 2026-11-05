@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../database');
 const { JWT_SECRET, authenticateToken, verifyAdmin } = require('../middleware/auth');
-const { sendVerificationOtpEmail, sendPasswordResetOtpEmail, getSmtpConfig } = require('../services/mailer');
+const { sendVerificationOtpEmail, sendPasswordResetOtpEmail, getSmtpConfig, getResendConfig } = require('../services/mailer');
 
 function formatDomainTitleCase(str) {
   if (!str) return '';

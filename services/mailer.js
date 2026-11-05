@@ -1,6 +1,58 @@
 const nodemailer = require('nodemailer');
 const db = require('../database');
 
+function getResendConfig() {
+  const defaultFrom = 'Future Sprint Technologies <onboarding@resend.dev>';
+  try {
+    const rowKey = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
+    const rowFrom = db.prepare("SELECT value FROM settings WHERE key = 'resend_from'").get();
+    const apiKey = (rowKey && rowKey.value && rowKey.value.trim()) ? rowKey.value.trim() : (process.env.RESEND_API_KEY || '');
+    const from = (rowFrom && rowFrom.value && rowFrom.value.trim()) ? rowFrom.value.trim() : (process.env.RESEND_FROM || defaultFrom);
+    return { apiKey, from };
+  } catch (e) {
+    return {
+      apiKey: process.env.RESEND_API_KEY || '',
+      from: process.env.RESEND_FROM || defaultFrom
+    };
+  }
+}
+
+async function sendViaResend(toEmail, toName, subject, htmlContent, textContent) {
+  const { apiKey, from } = getResendConfig();
+  if (!apiKey) return null;
+
+  try {
+    console.log(`🚀 [Resend HTTPS Port 443] Dispatching email to: ${toEmail} from: ${from}`);
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: from,
+        to: [toEmail],
+        subject: subject,
+        html: htmlContent,
+        text: textContent
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+
+    const data = await resp.json();
+    if (resp.ok && data.id) {
+      console.log(`✅ [Resend] Email delivered successfully! Message ID: ${data.id}`);
+      return { success: true, mode: 'resend', messageId: data.id };
+    }
+
+    console.error('⚠️ [Resend] API returned error:', data.message || data);
+    return { success: false, mode: 'resend', error: data.message || 'Resend error' };
+  } catch (err) {
+    console.error('⚠️ [Resend] Request exception:', err.message);
+    return { success: false, mode: 'resend', error: err.message };
+  }
+}
+
 function getSmtpConfig() {
   const defaultUser = 'futuresprintinterview@gmail.com';
   const defaultPass = 'smldivdyibnqvobv';
@@ -38,6 +90,12 @@ function getSmtpConfig() {
 function createTransporter() {
   const config = getSmtpConfig();
   if (config.user && config.pass) {
+    const fastTimeouts = {
+      connectionTimeout: 4000,
+      greetingTimeout: 3000,
+      socketTimeout: 5000
+    };
+
     // If using Gmail, service: 'gmail' automatically configures optimal ports & TLS across cloud hosts (Render, AWS, etc.)
     if (config.host === 'smtp.gmail.com' || config.user.endsWith('@gmail.com')) {
       return nodemailer.createTransport({
@@ -45,7 +103,8 @@ function createTransporter() {
         auth: {
           user: config.user,
           pass: config.pass
-        }
+        },
+        ...fastTimeouts
       });
     }
 
@@ -60,7 +119,8 @@ function createTransporter() {
       },
       tls: {
         rejectUnauthorized: false
-      }
+      },
+      ...fastTimeouts
     });
   }
   return null;
@@ -116,13 +176,22 @@ async function sendVerificationOtpEmail(toEmail, toName, otpCode) {
     </html>
   `;
 
+  const textContent = `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies verification code is: ${otpCode}\n\nThis OTP is valid for 10 minutes. Please enter this code on the portal to activate your account.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`;
+
   console.log('================================================================');
-  console.log(`📩 [Future Sprint Real Mail Service] Account Verification OTP`);
+  console.log(`📩 [Future Sprint Mail Service] Account Verification OTP`);
   console.log(`👉 Recipient: ${toEmail} (${toName})`);
   console.log(`🔑 OTP Code:  ${otpCode}`);
   console.log(`⏱️ Expiry:    10 Minutes`);
   console.log('================================================================');
 
+  // 1. Prioritize Resend HTTPS (Port 443 - works on Render with zero port blocking)
+  const resendResult = await sendViaResend(toEmail, toName, subject, htmlContent, textContent);
+  if (resendResult && resendResult.success) {
+    return { success: true, mode: 'resend', messageId: resendResult.messageId, otp: otpCode };
+  }
+
+  // 2. Fallback to SMTP
   const transporter = createTransporter();
 
   if (transporter) {
@@ -132,19 +201,17 @@ async function sendVerificationOtpEmail(toEmail, toName, otpCode) {
         from: fromAddress,
         to: toEmail,
         subject,
-        text: `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies verification code is: ${otpCode}\n\nThis OTP is valid for 10 minutes. Please enter this code on the portal to activate your account.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`,
+        text: textContent,
         html: htmlContent
       });
-      console.log('✅ Real Email sent successfully! MessageId:', info.messageId, 'Recipient:', toEmail);
+      console.log('✅ Real Email sent successfully via SMTP! MessageId:', info.messageId, 'Recipient:', toEmail);
       return { success: true, mode: 'smtp', messageId: info.messageId, otp: otpCode };
     } catch (err) {
       console.error('⚠️ Real SMTP delivery failed:', err.message);
-      // Fallback: log to terminal so verification is never blocked
       return { success: true, mode: 'logged', error: err.message, otp: otpCode };
     }
   }
 
-  // If no SMTP configured yet in .env, still allow the OTP flow to proceed smoothly like a hosted site
   return {
     success: true,
     mode: 'logged',
@@ -203,6 +270,8 @@ async function sendPasswordResetOtpEmail(toEmail, toName, otpCode) {
     </html>
   `;
 
+  const textContent = `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies password reset code is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`;
+
   console.log('================================================================');
   console.log(`🔑 [Future Sprint Security] Password Reset / Change OTP`);
   console.log(`👉 Recipient: ${toEmail} (${toName})`);
@@ -210,6 +279,13 @@ async function sendPasswordResetOtpEmail(toEmail, toName, otpCode) {
   console.log(`⏱️ Expiry:    10 Minutes`);
   console.log('================================================================');
 
+  // 1. Prioritize Resend HTTPS
+  const resendResult = await sendViaResend(toEmail, toName, subject, htmlContent, textContent);
+  if (resendResult && resendResult.success) {
+    return { success: true, mode: 'resend', messageId: resendResult.messageId, otp: otpCode };
+  }
+
+  // 2. Fallback to SMTP
   const transporter = createTransporter();
 
   if (transporter) {
@@ -219,10 +295,10 @@ async function sendPasswordResetOtpEmail(toEmail, toName, otpCode) {
         from: fromAddress,
         to: toEmail,
         subject,
-        text: `Hello ${toName || 'Student'},\n\nYour Future Sprint Technologies password reset code is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nFuture Sprint Technologies\nAllwyn X Roads, Hema Durga Plaza, Flat 207, Miyapur, Hyderabad`,
+        text: textContent,
         html: htmlContent
       });
-      console.log('✅ Real Password OTP sent successfully! MessageId:', info.messageId, 'Recipient:', toEmail);
+      console.log('✅ Real Password OTP sent successfully via SMTP! MessageId:', info.messageId, 'Recipient:', toEmail);
       return { success: true, mode: 'smtp', messageId: info.messageId, otp: otpCode };
     } catch (err) {
       console.error('⚠️ Real SMTP delivery failed:', err.message);
@@ -362,6 +438,8 @@ async function sendInterviewReminderEmail(data) {
     </html>
   `;
 
+  const textContent = `Interview with ${companyName} at ${interviewTime} on ${interviewDate}. Report immediately to Future Sprint Technologies office (Flat No: 207, Hema Durga Plaza, Miyapur, Hyderabad).`;
+
   console.log('================================================================');
   console.log(`⏰ [Future Sprint 2-Hour Reminder] Dispatched to Student`);
   console.log(`👉 Student:    ${toName} (${toEmail})`);
@@ -370,6 +448,13 @@ async function sendInterviewReminderEmail(data) {
   console.log(`📍 Reporting:  Hema Durga Plaza Flat 207, Miyapur`);
   console.log('================================================================');
 
+  // 1. Prioritize Resend HTTPS
+  const resendResult = await sendViaResend(toEmail, toName, subject, htmlContent, textContent);
+  if (resendResult && resendResult.success) {
+    return { success: true, mode: 'resend', messageId: resendResult.messageId };
+  }
+
+  // 2. Fallback to SMTP
   const transporter = createTransporter();
 
   if (transporter) {
@@ -380,7 +465,7 @@ async function sendInterviewReminderEmail(data) {
         subject,
         html: htmlContent
       });
-      console.log('✅ Real 2-Hour Reminder Email sent successfully! MessageId:', info.messageId);
+      console.log('✅ Real 2-Hour Reminder Email sent successfully via SMTP! MessageId:', info.messageId);
       return { success: true, mode: 'smtp', messageId: info.messageId };
     } catch (err) {
       console.error('⚠️ Real SMTP delivery failed for 2h reminder:', err.message);
@@ -397,6 +482,8 @@ async function sendInterviewReminderEmail(data) {
 
 module.exports = {
   getSmtpConfig,
+  getResendConfig,
+  sendViaResend,
   sendVerificationOtpEmail,
   sendPasswordResetOtpEmail,
   sendInterviewReminderEmail
