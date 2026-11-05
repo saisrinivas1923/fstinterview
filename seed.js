@@ -49,6 +49,11 @@ async function seed() {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
   `);
 
+  // Force-purge and replace any deprecated 'futuresprintinterview@gmail.com' entries in the database
+  db.prepare("UPDATE settings SET value = 'futuresprinttechnologies@gmail.com' WHERE key = 'smtp_user' AND value LIKE '%futuresprintinterview%'").run();
+  db.prepare("UPDATE settings SET value = 'jebckryilxerweju' WHERE key = 'smtp_pass' AND value = 'smldivdyibnqvobv'").run();
+  db.prepare("UPDATE settings SET value = '\"Future Sprint Technologies\" <futuresprinttechnologies@gmail.com>' WHERE key = 'from_email' AND value LIKE '%futuresprintinterview%'").run();
+
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     upsertSetting.run('smtp_user', process.env.SMTP_USER.trim());
     upsertSetting.run('smtp_pass', process.env.SMTP_PASS.replace(/\s+/g, ''));
@@ -58,7 +63,7 @@ async function seed() {
     console.log(`✅ SMTP settings initialized from environment for: ${process.env.SMTP_USER}`);
   } else {
     const existingSmtp = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get();
-    if (!existingSmtp || !existingSmtp.value || existingSmtp.value === 'futuresprintinterview@gmail.com') {
+    if (!existingSmtp || !existingSmtp.value) {
       const smtpUser = 'futuresprinttechnologies@gmail.com';
       const smtpPass = 'jebckryilxerweju';
       const smtpHost = 'smtp.gmail.com';

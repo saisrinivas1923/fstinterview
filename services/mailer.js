@@ -73,23 +73,41 @@ function getSmtpConfig() {
     const finalPort = Number(process.env.SMTP_PORT || config.smtp_port || 465);
     const finalFrom = process.env.FROM_EMAIL || config.from_email || defaultFrom;
 
+    // Strict Guard: Prevent and replace any use of deprecated 'futuresprintinterview@gmail.com'
+    let resolvedUser = finalUser;
+    if (resolvedUser === 'futuresprintinterview@gmail.com') {
+      resolvedUser = defaultUser;
+    }
+    let resolvedPass = finalPass;
+    if (resolvedUser === defaultUser && (!resolvedPass || resolvedPass === 'smldivdyibnqvobv')) {
+      resolvedPass = defaultPass;
+    }
+    let resolvedFrom = finalFrom;
+    if (resolvedFrom.includes('futuresprintinterview@gmail.com')) {
+      resolvedFrom = defaultFrom;
+    }
+
     return {
       host: finalHost,
       port: finalPort,
-      user: finalUser,
-      pass: finalPass,
-      from: finalFrom
+      user: resolvedUser,
+      pass: resolvedPass,
+      from: resolvedFrom
     };
   } catch (e) {
     console.error('getSmtpConfig error:', e.message);
-    const finalUser = (process.env.SMTP_USER || defaultUser).trim();
-    const finalPass = (process.env.SMTP_PASS || defaultPass).replace(/\s+/g, '');
+    let finalUser = (process.env.SMTP_USER || defaultUser).trim();
+    if (finalUser === 'futuresprintinterview@gmail.com') finalUser = defaultUser;
+    let finalPass = (process.env.SMTP_PASS || defaultPass).replace(/\s+/g, '');
+    if (finalUser === defaultUser && (!finalPass || finalPass === 'smldivdyibnqvobv')) finalPass = defaultPass;
+    let finalFrom = process.env.FROM_EMAIL || defaultFrom;
+    if (finalFrom.includes('futuresprintinterview@gmail.com')) finalFrom = defaultFrom;
     return {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT || 465),
       user: finalUser,
       pass: finalPass,
-      from: process.env.FROM_EMAIL || defaultFrom
+      from: finalFrom
     };
   }
 }
