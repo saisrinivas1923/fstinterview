@@ -394,7 +394,7 @@ const Auth = {
   },
 
   // Dedicated Real-Time OTP Modal for Student Login
-  openStudentLoginOtpModal(email, pushState = true, demoOtp = null) {
+  openStudentLoginOtpModal(email, pushState = true) {
     this.pendingStudentLoginEmail = email;
     if (pushState) {
       try {
@@ -404,18 +404,9 @@ const Auth = {
     const modal = document.getElementById('modal-student-login-otp');
     const emailDisplay = document.getElementById('student-login-otp-recipient');
     const hiddenOtpInput = document.getElementById('student-login-otp-code');
-    const cloudNotice = document.getElementById('modal-student-login-cloud-notice');
-    const fallbackCode = document.getElementById('modal-student-login-fallback-code');
 
     if (emailDisplay) emailDisplay.textContent = email;
     if (hiddenOtpInput) hiddenOtpInput.value = '';
-
-    if (demoOtp) {
-      if (cloudNotice) cloudNotice.classList.remove('hidden');
-      if (fallbackCode) fallbackCode.textContent = demoOtp;
-    } else {
-      if (cloudNotice) cloudNotice.classList.add('hidden');
-    }
 
     modal.classList.remove('hidden');
 
@@ -436,15 +427,9 @@ const Auth = {
     };
     this.studentLoginOtpDeck = deck;
 
-    if (demoOtp) {
-      setTimeout(() => {
-        if (this.studentLoginOtpDeck) this.studentLoginOtpDeck.setValue(demoOtp);
-      }, 300);
-    } else {
-      setTimeout(() => {
-        if (this.studentLoginOtpDeck) this.studentLoginOtpDeck.focus();
-      }, 150);
-    }
+    setTimeout(() => {
+      if (this.studentLoginOtpDeck) this.studentLoginOtpDeck.focus();
+    }, 150);
     if (window.lucide) lucide.createIcons();
   },
 
@@ -517,21 +502,9 @@ const Auth = {
       const res = await API.post('/api/auth/resend-login-otp', { email: this.pendingStudentLoginEmail });
       showToast(res.message || 'A fresh 6-digit verification code has been dispatched to your email.', 'info');
 
-      const cloudNotice = document.getElementById('modal-student-login-cloud-notice');
-      const fallbackCode = document.getElementById('modal-student-login-fallback-code');
-
-      if (res.demo_otp) {
-        if (cloudNotice) cloudNotice.classList.remove('hidden');
-        if (fallbackCode) fallbackCode.textContent = res.demo_otp;
-        if (this.studentLoginOtpDeck) {
-          this.studentLoginOtpDeck.setValue(res.demo_otp);
-        }
-      } else {
-        if (cloudNotice) cloudNotice.classList.add('hidden');
-        if (this.studentLoginOtpDeck) {
-          this.studentLoginOtpDeck.reset();
-          this.studentLoginOtpDeck.focus();
-        }
+      if (this.studentLoginOtpDeck) {
+        this.studentLoginOtpDeck.reset();
+        this.studentLoginOtpDeck.focus();
       }
     } catch (err) {
       showToast(err.message || 'Failed to resend OTP.', 'error');
@@ -622,21 +595,13 @@ const Auth = {
       showToast(`Verification OTP dispatched to ${this.pendingEmailForOtp}!`, 'success', 5000);
 
       if (msgBox) {
-        if (res.demo_otp) {
-          msgBox.innerHTML = `⚡ <strong>Cloud Notice:</strong> Free hosting restricted outbound email port.<br/>Your verification code is: <strong class="text-sm font-mono bg-amber-100 text-amber-900 px-2 py-0.5 rounded">${res.demo_otp}</strong> (Pre-filled below)`;
-        } else {
-          msgBox.innerHTML = `✅ 6-digit OTP code dispatched to <strong>${this.pendingEmailForOtp}</strong>.<br/><span class="text-[10px] text-slate-500 font-semibold">Please enter the 6-digit code in the boxes below.</span>`;
-        }
+        msgBox.innerHTML = `✅ 6-digit OTP code dispatched to <strong>${this.pendingEmailForOtp}</strong>.<br/><span class="text-[10px] text-slate-500 font-semibold">Please enter the 6-digit code in the boxes below.</span>`;
         msgBox.classList.remove('hidden');
       }
 
       if (this.inlineRegisterOtpDeck) {
-        if (res.demo_otp) {
-          this.inlineRegisterOtpDeck.setValue(res.demo_otp);
-        } else {
-          this.inlineRegisterOtpDeck.reset();
-          this.inlineRegisterOtpDeck.focus();
-        }
+        this.inlineRegisterOtpDeck.reset();
+        this.inlineRegisterOtpDeck.focus();
       }
     } catch (err) {
       showToast(err.message || 'Failed to dispatch registration OTP.', 'error', 6000);
@@ -806,7 +771,7 @@ const Auth = {
       this.pendingEmailForOtp = res.email || email;
       showToast(res.message || `Verification OTP dispatched to ${this.pendingEmailForOtp}!`, 'success', 5000);
 
-      this.openOtpModal(this.pendingEmailForOtp, true, res.demo_otp);
+      this.openOtpModal(this.pendingEmailForOtp);
     } catch (err) {
       showToast(err.message || 'Failed to register account.', 'error');
     } finally {
@@ -818,7 +783,7 @@ const Auth = {
     }
   },
 
-  openOtpModal(email, pushState = true, demoOtp = null) {
+  openOtpModal(email, pushState = true) {
     this.pendingEmailForOtp = email;
     if (pushState) {
       try {
@@ -828,18 +793,9 @@ const Auth = {
     const modal = document.getElementById('modal-otp-verification');
     const emailDisplay = document.getElementById('otp-recipient-email');
     const hiddenOtpInput = document.getElementById('input-otp-code');
-    const cloudNotice = document.getElementById('modal-otp-cloud-notice');
-    const fallbackCode = document.getElementById('modal-otp-fallback-code');
 
     if (emailDisplay) emailDisplay.textContent = email;
     if (hiddenOtpInput) hiddenOtpInput.value = '';
-
-    if (demoOtp) {
-      if (cloudNotice) cloudNotice.classList.remove('hidden');
-      if (fallbackCode) fallbackCode.textContent = demoOtp;
-    } else {
-      if (cloudNotice) cloudNotice.classList.add('hidden');
-    }
 
     modal.classList.remove('hidden');
 
@@ -861,16 +817,9 @@ const Auth = {
     this.registerOtpDeck = deck;
 
     this.startResendCooldown();
-
-    if (demoOtp) {
-      setTimeout(() => {
-        if (this.registerOtpDeck) this.registerOtpDeck.setValue(demoOtp);
-      }, 300);
-    } else {
-      setTimeout(() => {
-        if (this.registerOtpDeck) this.registerOtpDeck.focus();
-      }, 150);
-    }
+    setTimeout(() => {
+      if (this.registerOtpDeck) this.registerOtpDeck.focus();
+    }, 150);
     if (window.lucide) lucide.createIcons();
   },
 
@@ -938,24 +887,11 @@ const Auth = {
       const res = await API.post('/api/auth/resend-otp', { email: this.pendingEmailForOtp });
       showToast(res.message || 'A fresh 6-digit code has been sent to your email.', 'info');
 
-      const cloudNotice = document.getElementById('modal-otp-cloud-notice');
-      const fallbackCode = document.getElementById('modal-otp-fallback-code');
-
-      if (res.demo_otp) {
-        if (cloudNotice) cloudNotice.classList.remove('hidden');
-        if (fallbackCode) fallbackCode.textContent = res.demo_otp;
-        if (this.registerOtpDeck) {
-          this.registerOtpDeck.setValue(res.demo_otp);
-        }
-      } else {
-        if (cloudNotice) cloudNotice.classList.add('hidden');
-        if (this.registerOtpDeck) {
-          this.registerOtpDeck.reset();
-          this.registerOtpDeck.focus();
-        }
-      }
-
       this.startResendCooldown();
+      if (this.registerOtpDeck) {
+        this.registerOtpDeck.reset();
+        this.registerOtpDeck.focus();
+      }
     } catch (err) {
       showToast(err.message || 'Failed to resend OTP.', 'error');
     } finally {
@@ -1057,16 +993,6 @@ const Auth = {
           if (step1) step1.classList.add('hidden');
           if (step2) step2.classList.remove('hidden');
 
-          const cloudNotice = document.getElementById('forgot-otp-cloud-notice');
-          const fallbackCode = document.getElementById('forgot-otp-fallback-code');
-
-          if (res.demo_otp) {
-            if (cloudNotice) cloudNotice.classList.remove('hidden');
-            if (fallbackCode) fallbackCode.textContent = res.demo_otp;
-          } else {
-            if (cloudNotice) cloudNotice.classList.add('hidden');
-          }
-
           if (!this.forgotOtpDeck) {
             this.forgotOtpDeck = new OTPDeckController({
               containerId: 'otp-deck-forgot-pwd',
@@ -1081,14 +1007,7 @@ const Auth = {
           } else {
             this.forgotOtpDeck.reset();
           }
-
-          if (res.demo_otp) {
-            setTimeout(() => {
-              if (this.forgotOtpDeck) this.forgotOtpDeck.setValue(res.demo_otp);
-            }, 300);
-          } else {
-            if (this.forgotOtpDeck) this.forgotOtpDeck.focus();
-          }
+          if (this.forgotOtpDeck) this.forgotOtpDeck.focus();
           if (window.lucide) lucide.createIcons({ root: modal });
         } catch (err) {
           showToast(err.message || 'Failed to dispatch password OTP.', 'error');

@@ -116,19 +116,12 @@ router.post('/register', async (req, res) => {
     const mailResult = await sendVerificationOtpEmail(trimmedEmail, trimmedName, otpCode);
     console.log(`[Registration] Verification OTP dispatch to ${trimmedEmail}: mode=${mailResult.mode}, success=${mailResult.success}`);
 
-    const responsePayload = {
+    return res.status(200).json({
       success: true,
       requires_otp: true,
       email: trimmedEmail,
       message: `A 6-digit verification code has been dispatched to ${trimmedEmail}.`
-    };
-
-    if (mailResult.mode !== 'smtp' && mailResult.mode !== 'api') {
-      responsePayload.demo_otp = otpCode;
-      responsePayload.cloud_notice = 'Cloud free hosting blocked standard SMTP ports (465/587). Verification code provided directly.';
-    }
-
-    return res.status(200).json(responsePayload);
+    });
   } catch (err) {
     console.error('Registration error:', err);
     return res.status(500).json({
@@ -282,20 +275,13 @@ router.post('/forgot-password-otp', async (req, res) => {
     `).run(trimmedEmail, otpCode);
 
     // Send email via mailer
-    const mailResult = await sendPasswordResetOtpEmail(trimmedEmail, user.name, otpCode);
+    await sendPasswordResetOtpEmail(trimmedEmail, user.name, otpCode);
 
-    const responsePayload = {
+    return res.status(200).json({
       success: true,
       email: trimmedEmail,
       message: `A 6-digit password reset OTP has been sent to ${trimmedEmail}.`
-    };
-
-    if (mailResult && mailResult.mode !== 'smtp' && mailResult.mode !== 'api') {
-      responsePayload.demo_otp = otpCode;
-      responsePayload.cloud_notice = 'Cloud free hosting blocked standard SMTP ports (465/587). Verification code provided directly.';
-    }
-
-    return res.status(200).json(responsePayload);
+    });
   } catch (err) {
     console.error('Forgot password OTP error:', err);
     return res.status(500).json({
@@ -424,18 +410,18 @@ router.post('/resend-otp', async (req, res) => {
 
     const mailResult = await sendVerificationOtpEmail(trimmedEmail, userData.name, newOtp);
 
-    const responsePayload = {
+    if (!mailResult.success) {
+      return res.status(503).json({
+        error: 'EMAIL_DELIVERY_FAILED',
+        message: `Failed to dispatch OTP to ${trimmedEmail}: ${mailResult.error || mailResult.notice}`
+      });
+    }
+
+    return res.json({
       success: true,
       email: trimmedEmail,
       message: `A fresh 6-digit verification code has been dispatched to ${trimmedEmail}.`
-    };
-
-    if (mailResult && mailResult.mode !== 'smtp' && mailResult.mode !== 'api') {
-      responsePayload.demo_otp = newOtp;
-      responsePayload.cloud_notice = 'Cloud free hosting blocked standard SMTP ports (465/587). Verification code provided directly.';
-    }
-
-    return res.json(responsePayload);
+    });
   } catch (err) {
     console.error('Resend OTP error:', err);
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to resend OTP.' });
@@ -632,18 +618,12 @@ router.post('/resend-login-otp', async (req, res) => {
       VALUES (?, ?, 'login', ?, datetime('now', '+10 minutes'))
     `).run(trimmedEmail, otpCode, JSON.stringify({ userId: user.id }));
 
-    const mailResult = await sendVerificationOtpEmail(trimmedEmail, user.name, otpCode);
+    await sendVerificationOtpEmail(trimmedEmail, user.name, otpCode);
 
-    const responsePayload = {
+    return res.json({
       success: true,
       message: `Fresh verification OTP dispatched in real time to ${trimmedEmail}.`
-    };
-
-    if (mailResult && mailResult.mode !== 'smtp' && mailResult.mode !== 'api') {
-      responsePayload.demo_otp = otpCode;
-    }
-
-    return res.json(responsePayload);
+    });
   } catch (err) {
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to resend login OTP.' });
   }
@@ -745,16 +725,16 @@ router.post('/smtp-test', authenticateToken, verifyAdmin, async (req, res) => {
     const testOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const result = await sendVerificationOtpEmail(recipient, 'Future Sprint Admin', testOtp);
 
-    if (result.mode === 'smtp' || result.mode === 'api') {
+    if (result.mode === 'smtp') {
       return res.json({
         success: true,
-        message: `✅ Test email successfully delivered to ${recipient} via ${result.mode.toUpperCase()}!`,
+        message: `✅ Test email successfully delivered to ${recipient}!`,
         messageId: result.messageId
       });
     } else {
       return res.status(400).json({
         error: 'DELIVERY_FAILED',
-        message: `SMTP test failed: ${result.error || 'Could not connect to SMTP server. Cloud firewall may be blocking outbound port 465/587.'}`
+        message: `SMTP test failed: ${result.error || 'Could not connect to SMTP server. Verify your credentials/app password.'}`
       });
     }
   } catch (err) {

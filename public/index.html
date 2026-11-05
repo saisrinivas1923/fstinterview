@@ -837,18 +837,6 @@
         <strong id="otp-recipient-email" class="text-slate-800 font-bold">your-email@example.com</strong>
       </p>
 
-      <!-- Cloud Host SMTP Blocked Notice (shown when Render free tier firewall drops SMTP) -->
-      <div id="modal-otp-cloud-notice" class="hidden mb-4 p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-left">
-        <div class="flex items-start gap-2.5">
-          <i data-lucide="info" class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"></i>
-          <div class="text-[11px] text-amber-900 leading-snug">
-            <span class="font-bold">Cloud Server Notice:</span> Outbound email port (465/587) is restricted on free cloud hosting. Your verification code is:
-            <span id="modal-otp-fallback-code" class="inline-block font-mono font-black text-sm bg-amber-200 text-amber-950 px-2 py-0.5 rounded mx-1">------</span>
-            <span class="text-[10px] text-amber-700 block mt-1">(Pre-filled automatically below - click Verify to continue)</span>
-          </div>
-        </div>
-      </div>
-
       <form id="form-verify-otp" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-700 text-center mb-2 font-heading">Enter 6-Digit Verification Code</label>
@@ -961,18 +949,6 @@
           <i data-lucide="mail-check" class="w-4 h-4 text-[#bf6088]"></i> Verification code sent to:
         </div>
         <p id="student-login-otp-recipient" class="text-xs text-[#8a6cc0] font-bold mt-1">student@futuresprint.in</p>
-      </div>
-
-      <!-- Cloud Host SMTP Blocked Notice -->
-      <div id="modal-student-login-cloud-notice" class="hidden mb-3 p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-left">
-        <div class="flex items-start gap-2.5">
-          <i data-lucide="info" class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"></i>
-          <div class="text-[11px] text-amber-900 leading-snug">
-            <span class="font-bold">Cloud Server Notice:</span> Outbound email port (465/587) is restricted on free cloud hosting. Your verification code is:
-            <span id="modal-student-login-fallback-code" class="inline-block font-mono font-black text-sm bg-amber-200 text-amber-950 px-2 py-0.5 rounded mx-1">------</span>
-            <span class="text-[10px] text-amber-700 block mt-1">(Pre-filled automatically below - click Verify to continue)</span>
-          </div>
-        </div>
       </div>
 
       <form id="form-verify-student-login-otp" class="space-y-4" onsubmit="event.preventDefault(); Auth.confirmStudentLoginOtp();">
@@ -1495,18 +1471,6 @@
       <form id="forgot-step-2" class="space-y-3.5 hidden">
         <div class="p-3 bg-purple-50/60 rounded-xl border border-purple-100 text-xs text-slate-600">
           OTP code dispatched to <strong id="forgot-confirmed-email" class="text-[#8a6cc0] font-bold">your-email@example.com</strong>.
-        </div>
-
-        <!-- Cloud Host SMTP Blocked Notice -->
-        <div id="forgot-otp-cloud-notice" class="hidden p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-left">
-          <div class="flex items-start gap-2.5">
-            <i data-lucide="info" class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"></i>
-            <div class="text-[11px] text-amber-900 leading-snug">
-              <span class="font-bold">Cloud Server Notice:</span> Outbound email port (465/587) is restricted on free cloud hosting. Your reset code is:
-              <span id="forgot-otp-fallback-code" class="inline-block font-mono font-black text-sm bg-amber-200 text-amber-950 px-2 py-0.5 rounded mx-1">------</span>
-              <span class="text-[10px] text-amber-700 block mt-1">(Pre-filled automatically below)</span>
-            </div>
-          </div>
         </div>
 
         <div>
