@@ -32,6 +32,7 @@ async function sendViaResend(toEmail, toName, subject, htmlContent, textContent)
       body: JSON.stringify({
         from: from,
         to: [toEmail],
+        reply_to: 'futuresprinttechnologies@gmail.com',
         subject: subject,
         html: htmlContent,
         text: textContent
@@ -225,6 +226,7 @@ async function sendVerificationOtpEmail(toEmail, toName, otpCode) {
       const info = await transporter.sendMail({
         from: fromAddress,
         to: toEmail,
+        replyTo: 'futuresprinttechnologies@gmail.com',
         subject,
         text: textContent,
         html: htmlContent
@@ -319,6 +321,7 @@ async function sendPasswordResetOtpEmail(toEmail, toName, otpCode) {
       const info = await transporter.sendMail({
         from: fromAddress,
         to: toEmail,
+        replyTo: 'futuresprinttechnologies@gmail.com',
         subject,
         text: textContent,
         html: htmlContent
@@ -487,6 +490,7 @@ async function sendInterviewReminderEmail(data) {
       const info = await transporter.sendMail({
         from: config.from,
         to: toEmail,
+        replyTo: 'futuresprinttechnologies@gmail.com',
         subject,
         html: htmlContent
       });
